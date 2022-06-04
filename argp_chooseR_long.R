@@ -1,5 +1,5 @@
-# PATH to INPUT: "/mnt/tank/scratch/rasmirnov/code/chooseR/data/pbmc3k_tutorial.RData"
-# PATH to OUTPUT: "/mnt/tank/scratch/rasmirnov/code/chooseR/results/pbmc3k/argparse_res"
+# PATH to INPUT: "/mnt/tank/scratch/rasmirnov/code/Time_benchmarking/Datasets/processed/obj/obj_tutorial.RData"
+# PATH to OUTPUT: "/mnt/tank/scratch/rasmirnov/code/chooseR/results/pbmc3k/argparse_res3"
 
 source("/mnt/tank/scratch/rasmirnov/code/chooseR/scripts/pipeline/pipeline.R") 
 library(Seurat)
@@ -20,22 +20,31 @@ parser$add_argument('-r',
                     '--res',
                     type = 'character',
                     help = 'path to output directory')
-parser$add_argument('-o',
-                    '--obj',
+parser$add_argument('-i',                                   # immune.combined.sct
+                    '--obj_integ',
+                    type = 'character',
+                    help = 'name of a seurat_object')
+parser$add_argument('-o',                                   # ifnb, stestis, etc
+                    '--obj_name',
                     type = 'character',
                     help = 'name of a seurat_object')
 
-args <- parser$parse_args()                          # ?separation of args inside the container
 
-load(args$data)
-#!! take a name of the specific object from .RData file:
-object <- get(args$obj)
-results_path <- args$res
-resolutions <- c(0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 5)
-# resolutions <- c(0.05, 0.1)
+argss <- parser$parse_args()                          # ?separation of args inside the container
+argss
+load(argss$data)
+object <- get(argss$obj_integ)
+obj_name <- argss$obj_name
+results_path <- argss$res
+# results_path <- '/mnt/tank/scratch/rasmirnov/code/chooseR/results/stestis'
+# resolutions <- 0.05
+resolutions <- c(0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 5)                     # 0.05 was removed
+
 setwd(results_path)
 
 # Run pipeline
+start.time <- Sys.time()
+
 chooseR <- function(seurat_obj, 
                     resolutions,
                     n, 
@@ -64,10 +73,6 @@ chooseR <- function(seurat_obj,
     
     # Now calculate the co-clustering frequencies
     message(paste0("Tallying ", res, "..."))
-    # This is the more time efficient vectorisation
-    # However, it exhausts vector memory for (nearly) all datasets
-    # matches <- purrr::map(columns, find_matches, df = results)
-    # matches <- purrr::reduce(matches, `+`)
     columns <- colnames(dplyr::select(results, -cell))
     mtchs <- matrix(0, nrow = dim(results)[1], ncol = dim(results)[1])
     i <- 1 # Counter
@@ -111,31 +116,21 @@ chooseR <- function(seurat_obj,
     saveRDS({{seurat_obj}}, paste0(results_path, "clustered_data.rds"))
   }
 }
+
+
 # Microbenchmarking + Function call
 mbm <- microbenchmark(
-  pbmc3k_n25 = chooseR(object, resolutions, n=25, results_path = results_path, npcs = 50),
-  pbmc3k_n50 = chooseR(object, resolutions, n=50, results_path = results_path, npcs = 50),
-  pbmc3k_n100 = chooseR(object, resolutions, n=100, results_path = results_path, npcs = 50),
-  times = 5
+  pbmc3k_n100 = chooseR(object, resolutions, n=100, results_path = results_path, npcs = 50),        # n=100
+  times = 1
 )
-# mbm <- microbenchmark(
-#   pbmc3k_n25 = chooseR(object, resolutions, n=2, results_path = results_path, npcs = 50),
-#   times = 2
-# )
-autoplot(mbm)
 
-ggsave(
-  path = results_path,                                      
-  filename = "microbench_chooseR.png",                         # paste0(obj_name, "_microbench_chooseR.png")
-  height = 4,
-  width = 7,
-  units = "in"
-)
+#### Extra timing
+end.time <- Sys.time() - start.time
 
 # Create silhouette plot
 # Read in scores and calculate CIs
 # set preferable 'n' which you want research:  
-n=100
+n=100                            #n=100
 results_path <- sprintf("%s/n_%s", results_path, n)                #! очень важный элемент
 scores <- purrr::map(
   paste0(results_path, "silhouette_grouped_", resolutions, ".rds"),
@@ -242,5 +237,4 @@ ggsave(
 )
 
 # # save.image('pbmc3k_chooseR.RData')
-obj_name <- args$obj
 save.image(file = paste0(obj_name, '_chooseR.RData'))
