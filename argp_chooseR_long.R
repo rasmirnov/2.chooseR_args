@@ -49,15 +49,7 @@ chooseR <- function(seurat_obj,
     message(paste0("Clustering ", res, "..."))
     message("\tFinding ground truth...")
     
-    # "Truths" will be stored at glue::glue("{reduction}.{assay}_res.{res}")
-    seurat_obj <- find_clusters(
-      seurat_obj, # replace obj to name of the seurat object
-      reduction = reduction,
-      npcs = npcs,
-      resolution = res,
-      assay = assay # by default, it uses 100 PCs 
-    )
-    clusters <- seurat_obj[[glue::glue("{reduction}.{assay}_res.{res}")]]
+    clusters <- seurat_obj[[glue::glue("integrated_snn_res.{res}")]]
     
     # Now perform iterative, sub-sampled clusters
     results <- multiple_cluster(
